@@ -103,7 +103,20 @@ SELECT id, predicted_label
 FROM ML.PREDICT(MODEL my_dataset.regression_model,
   (SELECT id, feature1, feature2 FROM my_dataset.regression_table));
 
-
+SELECT
+  t.id,
+  t.label AS actual_label,
+  p.predicted_label,
+  p.predicted_label - t.label AS error,
+  ABS(p.predicted_label - t.label) AS abs_error
+FROM
+  my_dataset.regression_table AS t
+JOIN
+  ML.PREDICT(MODEL my_dataset.regression_model,
+    (SELECT id, feature1, feature2 FROM my_dataset.regression_table)
+  ) AS p
+USING (id)
+  
 -- Step 2a: create base features
 CREATE OR REPLACE TABLE my_dataset.classification_features AS
 SELECT
