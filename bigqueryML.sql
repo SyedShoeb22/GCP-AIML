@@ -164,7 +164,7 @@ CREATE OR REPLACE MODEL my_dataset.boosted_reg
 OPTIONS(
   model_type = 'boosted_tree_regressor',
   input_label_cols = ['label'],
-  max_iterations = 50   -- ✅ correct parameter name
+  max_iterations = 4   -- ✅ correct parameter name
 ) AS
 SELECT
   feature1,
@@ -177,7 +177,7 @@ CREATE OR REPLACE MODEL my_dataset.boosted_clf
 OPTIONS(
   model_type = 'boosted_tree_classifier',
   input_label_cols = ['label'],
-  max_iterations = 50
+  max_iterations = 7
 ) AS
 SELECT age, income_k, is_young, is_mid, is_senior, label FROM my_dataset.classification_features_onehot;
 
@@ -214,17 +214,52 @@ SELECT *
 FROM ML.RECOMMEND(MODEL my_dataset.reco_mf,
   (SELECT 'user_123' AS user_id), STRUCT(10 AS max_recommendations));
 
--- Autoencoder (anomaly detection / dimensionality reduction)
-CREATE OR REPLACE MODEL my_dataset.autoenc_model
+-- Kmeans
+
+CREATE OR REPLACE MODEL my_dataset.kmeans_model
 OPTIONS(
-  model_type='auto_encoder',
-  input_label_cols=[],        -- none; unsupervised
-  hidden_units=[64,32,8]     -- example architecture
+  model_type = 'kmeans',
+  num_clusters = 3
 ) AS
 SELECT
   SAFE_CAST(num1 AS FLOAT64) AS num1,
   SAFE_CAST(num2 AS FLOAT64) AS num2,
   SAFE_CAST(num3 AS FLOAT64) AS num3
 FROM my_dataset.autoenc_table;
+
+CREATE OR REPLACE TABLE my_dataset.autoenc_table AS
+SELECT
+  GENERATE_UUID() AS id,
+  RAND() * 10 AS num1,
+  RAND() * 5 AS num2,
+  RAND() * 7 AS num3
+FROM UNNEST(GENERATE_ARRAY(1, 1000));
+
+-- Train a KMeans model
+CREATE OR REPLACE MODEL my_dataset.kmeans_model
+OPTIONS(
+  model_type = 'kmeans',
+  num_clusters = 3
+) AS
+SELECT num1, num2, num3 FROM my_dataset.autoenc_table;
+
+-- View cluster centroids
+SELECT *
+FROM ML.CENTROIDS(MODEL my_dataset.kmeans_model);
+
+-- Assign clusters to each row
+CREATE OR REPLACE TABLE my_dataset.kmeans_predictions AS
+SELECT
+  a.id,
+  p.centroid_id
+FROM
+  ML.PREDICT(MODEL my_dataset.kmeans_model,
+    (SELECT id, num1, num2, num3 FROM my_dataset.autoenc_table)
+  ) AS p
+JOIN my_dataset.autoenc_table AS a
+  ON TRUE;
+
+
+
 
 
